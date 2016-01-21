@@ -21,39 +21,47 @@ import java.util.logging.Logger;
 public class MidstRBPServer {
 
     private static final int PORT = 3012;
-//    private static HashSet<String> names = new HashSet<>();
-//    private static HashSet<PrintWriter> writers = new HashSet<>();
     
     private final static Logger LOGGER = Logger.getLogger(MidstRBPServer.class.getName()); 
     static SerialCommReader scomr1=new SerialCommReader();
+    static int clientConnected =0;
     public static void main(String args[]) throws Exception 
     { 
 
         System.out.println("The chat server is running.");
-        ServerSocket listener=null;
+        ServerSocket serverSocket=null;
         try 
         {
-                 listener = new ServerSocket(PORT);
+//                 serverSocket = new ServerSocket(PORT);
+                
                  
                  Serial serial=SerialCommReader.SerialCommReader();
                  System.out.println("chech 1:");
                  new CardReader(serial).start();
+                 
+                 new IPProviderThread().start();
             
             while (true) 
             {
-                System.out.println("The chat server");
-                
-                Socket socket = listener.accept();
-                
-                BufferedReader in = new BufferedReader(new InputStreamReader( socket.getInputStream()));
-                PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-                
-                CardIDSender cis= new CardIDSender(out);
-                cis.start();
-                new Handler(in,out,cis).start();
-                
-                LOGGER.info("main()---ClientAccepted");
-                System.out.println("ClientAccepted");
+                if(clientConnected==0)
+                {
+                    serverSocket = new ServerSocket(PORT);
+                    System.out.println("The chat server");
+                    Socket socket = serverSocket.accept();
+
+                    BufferedReader in = new BufferedReader(new InputStreamReader( socket.getInputStream()));
+                    PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+
+                    CardIDSender cis= new CardIDSender(out);
+                    cis.start();
+                    new Handler(in,out,cis).start();
+
+                    LOGGER.info("main()---ClientAccepted");
+                    System.out.println("ClientAccepted");
+                    clientConnected=1;
+                    serverSocket.close();
+                   
+                }
             }
         }
         catch(IOException e)
@@ -69,8 +77,8 @@ public class MidstRBPServer {
         finally 
         {
             LOGGER.info("main()---listener closed");
-            if(listener!=null)
-            listener.close();
+            if(serverSocket!=null)
+            serverSocket.close();
         }
     }
 
@@ -109,18 +117,17 @@ public class MidstRBPServer {
             catch (IOException e) 
             {
                 LOGGER.warning("Handler---IOException");
-                cis.runFlag=false;
                 System.out.println("IOException-----Handler-----"+e.getMessage());
             } 
             catch (Exception e) 
             {
                 LOGGER.warning("Handler---Exception");
-                cis.runFlag=false;
                 System.out.println("Exception-----Handler--------"+e.getMessage());
             } 
             finally 
             {
-                
+               clientConnected=0;
+                cis.runFlag=false;
             }
         }
     }
@@ -220,4 +227,71 @@ public class MidstRBPServer {
             }
         }
     }
+       
+       
+     private static class IPProviderThread extends Thread {
+       private static final int listenerPORT = 2535;
+        @Override
+        public void run() 
+        {
+            try 
+            {
+        System.out.println("The chat server is running.");
+        ServerSocket listener=null;
+        try 
+        {
+                 listener = new ServerSocket(listenerPORT);
+            while (true) 
+            {
+                System.out.println("Start");
+                
+                Socket socket = listener.accept();
+                
+                BufferedReader in = new BufferedReader(new InputStreamReader( socket.getInputStream()));
+                PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+                
+                try
+                {
+                 String input = in.readLine();
+                 if("midst".equals(input))
+                 {
+                  out.println("yes");
+                 }
+                 in.close();
+                 out.close();
+                 socket.close();
+                }
+                catch(Exception e)
+                {
+                
+                }
+                System.out.println("ClientAccepted");
+            }
+        }
+        catch(IOException e)
+        {
+            System.out.println("IPProviderThread---IOException------"+e.getMessage());
+        }
+        catch(Exception e)
+        {
+            System.out.println("IPProviderThread---Exception------"+e.getMessage());
+        }
+        finally 
+        {
+            if(listener!=null)
+            listener.close();
+        }
+            }
+            catch (Exception e) 
+            {
+                LOGGER.warning("IPProviderThread---Exception");
+                System.out.println("Exception-----IPProviderThread--------"+e.getMessage());
+            }
+            finally 
+            {
+
+            }
+        }
+    }
+       
 }
